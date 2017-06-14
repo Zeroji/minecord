@@ -28,14 +28,24 @@ class Client(discord.Client):
                 self.proc.kill()
             await self.logout()
         elif text.startswith('start'):  # Start server
-            self.proc = subprocess.Popen(self.cfg['mc-command'].split(), cwd=self.cfg['mc-directory'], stdin=subprocess.PIPE)
+            self.proc = subprocess.Popen(self.cfg['mc-command'].split(), cwd=self.cfg['mc-directory'],
+                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.loop.create_task(self.read_console())
         else:  # Send command to server
-            self.proc.stdin.write(text.encode()+b'\n')
-            self.proc.stdin.flush()
+            if self.proc is not None and self.proc.poll() is None:
+                self.proc.stdin.write(text.encode()+b'\n')
+                self.proc.stdin.flush()
 
     async def on_ready(self):
         self.channel = self.get_channel(self.cfg['channel'])
         await self.send_message(self.channel, "Hi everyone!")
+
+    async def read_console(self):  # Loop through the console output
+        while self.proc is not None and self.proc.poll() is None:
+            line = await self.loop.run_in_executor(None, self.proc.stdout.readline)  # Async readline
+            # [TEMP] Post the output to Discord
+            if len(line) > 0:
+                await self.send_message(self.channel, line.decode())
 
 
 def main():
