@@ -50,3 +50,7 @@ python3 minecord.py
 From Discord, you can use `@minecord start` to start the server, `@minecord
 bye` to shutdown Minecord, or `@minecord <command>` to send a command to the
 server.
+
+Occasionally, the client will add reactions to its own messages. You can then
+click on them to trigger certain actions, for example accepting the EULA
+or restarting the server.

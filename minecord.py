@@ -5,6 +5,7 @@ import subprocess
 import re
 import time
 import discord
+import emoji
 
 
 class Client(discord.Client):
@@ -29,9 +30,9 @@ class Client(discord.Client):
             except discord.NotFound:
                 pass
             else:
-                # Remove reactions on the previous trigger
+                # Remove reactions on the previous trigger (from this tag)
                 for reaction in msg.reactions:
-                    if reaction.me:
+                    if reaction.me and reaction.emoji in emoji.TRIGGERS[tag]:
                         await self.remove_reaction(msg, reaction.emoji, self.me)
         if message is None:
             self.triggers.pop(tag)
@@ -77,13 +78,13 @@ class Client(discord.Client):
             content = open(eula).read().replace('eula=false', 'eula=true')
             open(eula, 'w').write(content)
             await self.set_trigger('eula', None)
-            await self.send_tag('service', '▶', 'EULA accepted. You can now start the server.')
+            await self.send_tag('service', emoji.START_SRV, 'EULA accepted. You can now start the server.')
         elif tag == 'service':
-            if reaction.emoji == '▶':  # Start server
+            if reaction.emoji == emoji.START_SRV:
                 pass
-            elif reaction.emoji == '⏹':  # Stop server
+            elif reaction.emoji == emoji.STOP_SRV:
                 pass
-            elif reaction.emoji == '🔁':  # Restart server
+            elif reaction.emoji == emoji.RESTART_SRV:
                 pass
         else:
             await self.send('Reaction received: ' + reaction.emoji)
@@ -140,7 +141,7 @@ class Client(discord.Client):
             message = "You need to agree to Mojang's End-User License Agreement in order to run the server.\n" \
                 "For more information, please visit <https://account.mojang.com/documents/minecraft_eula>.\n" \
                 "By clicking the button below you are indicating your agreement to Mojang's EULA."
-            await self.send_tag('eula', ['✅'], message)
+            await self.send_tag('eula', emoji.ACCEPT_EULA, message)
 
 
 def main():
