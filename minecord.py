@@ -21,20 +21,24 @@ class Client(discord.Client):
         self.me: discord.Member = None
         self.chat: bool = False
         self.shells: dict = {}
+        self.chat_message: discord.Message = None
+        self.prefixes: list = []
 
     # discord.py events
 
     async def on_message(self, message):
         if message.channel != self.channel:
             return  # Only one channel
-        if message.author.id in self.shells:  # Active shell
-            await self.shell_wrapper(message.author, message.clean_content)
-            return
-        if not message.content.startswith(self.user.mention):
-            return  # Must start with a mention
         if message.author == self.me:
             return  # Can't reply to self
-        text = message.content.split(None, 1)[1]
+        try:
+            prefix, text = message.content.split(None, 1)
+        except ValueError:
+            prefix, text = '', message.content
+        if prefix not in self.prefixes:  # Must start with prefix, or be a shell
+            if message.author.id in self.shells:  # Active shell
+                await self.shell_wrapper(message.author, message.clean_content)
+            return
         if len(text) == 0:
             return  # No empty messages
         if text.startswith('bye'):
@@ -74,12 +78,10 @@ class Client(discord.Client):
             elif reaction.emoji == emoji.RESTART_SRV:
                 await self.restart_server()
         elif tag == 'chat_init':
-            self.chat = True
-            await self.set_trigger('chat_init', None)
+            await self.set_chat(True)
         elif tag == 'chat':
             if reaction.emoji == emoji.CHAT_STOP:
-                self.chat = False
-                await self.set_trigger('chat', None)
+                await self.set_chat(False)
             elif reaction.emoji == emoji.CHAT_SHELL:
                 await self.shell_activate(user, self.shell_chat)
         else:
@@ -88,6 +90,8 @@ class Client(discord.Client):
     async def on_ready(self):
         self.channel = self.get_channel(self.cfg['channel'])
         self.me = self.channel.server.me
+        self.prefixes.append(self.user.mention)
+        self.prefixes.extend(self.cfg['prefixes'])
         await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
 
     # discord-related functions
@@ -245,6 +249,9 @@ class Client(discord.Client):
             await self.send('Server stopped in {time:.3f}s'.format(time=t))
         else:
             await self.send('Server timed out and was killed')
+        await self.set_trigger('control', None)
+        await self.set_trigger('chat', None)
+        await self.set_trigger('chat_init', None)
 
     async def kill_server(self):
         await self._kill()
@@ -254,6 +261,17 @@ class Client(discord.Client):
         await self.stop_server()
         self._start()
         await self.send_tag('control', emoji.TRIGGERS['control'], 'Server restarted!')
+
+    async def set_chat(self, value):
+        if self.chat == value:
+            return
+        self.chat = value
+        if self.chat_message is not None:
+            await self.delete_message(self.chat_message)
+        await self.set_trigger('chat_init', None)
+        await self.set_trigger('chat', None)
+        tag = 'chat' if self.chat else 'chat_init'
+        self.chat_message = await self.send_tag(tag, emoji.TRIGGERS[tag], 'Chat enabled' if self.chat else 'Chat muted')
 
 
 def main():
