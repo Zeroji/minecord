@@ -19,6 +19,7 @@ class Client(discord.Client):
         self.cfg: dict = config
         self.triggers: dict = {}
         self.me: discord.Member = None
+        self.chat: bool = False
 
     # discord.py events
 
@@ -68,6 +69,13 @@ class Client(discord.Client):
                 await self.kill_server()
             elif reaction.emoji == emoji.RESTART_SRV:
                 await self.restart_server()
+        elif tag == 'chat_init':
+            self.chat = True
+            await self.set_trigger('chat_init', None)
+        elif tag == 'chat':
+            if reaction.emoji == emoji.CHAT_STOP:
+                self.chat = False
+                await self.set_trigger('chat', None)
         else:
             await self.send('Reaction received: ' + reaction.emoji)
 
@@ -95,6 +103,7 @@ class Client(discord.Client):
         """Send a message with reactions and add it as a trigger."""
         message = await self.send_react(reactions, *args, **kwargs)
         await self.set_trigger(tag, message)
+        return message
 
     async def set_trigger(self, tag, message):
         """Set/change a trigger message.
@@ -137,13 +146,23 @@ class Client(discord.Client):
 
     async def on_line(self, timestamp, logger, line: str):
         """Process one line of output."""
-        if line.startswith('You need to agree to the EULA in order to run the server.'):
+        if line.startswith('You need to agree to the EULA in order to run the server.'):  # EULA error
             message = "You need to agree to Mojang's End-User License Agreement in order to run the server.\n" \
                 "For more information, please visit <https://account.mojang.com/documents/minecraft_eula>.\n" \
                 "By clicking the button below you are indicating your agreement to Mojang's EULA."
             await self.send_tag('eula', emoji.ACCEPT_EULA, message)
-        else:
-            await self.send(line)
+        if line.startswith('[Server] ') or re.match(r'<[^\s<>]*> ', line) is not None:  # Chat messages
+            if not self.chat:
+                return
+            if line.startswith('[Server] '):
+                message = line[9:]
+                author = 'SERVER'
+                if line.startswith('<'):  # Message sent by the bridge
+                    return
+            else:
+                match = re.match(r'<([^\s<>]*)> (.*)', line)
+                author, message = match.groups()
+            await self.send_tag('chat', emoji.TRIGGERS['chat'], f'**{author}**: {message}')
 
     # server-related functions
 
@@ -176,7 +195,9 @@ class Client(discord.Client):
     async def start_server(self):
         self._start()
         await self.set_trigger('start', None)
-        await self.send_tag('control', emoji.TRIGGERS['control'], 'Server started!')
+        m = await self.send_tag('control', emoji.TRIGGERS['control'], 'Server started!')
+        await self.add_reaction(m, emoji.CHAT_START)
+        await self.set_trigger('chat_init', m)
 
     async def stop_server(self):
         """Stop the server, kill it after a timeout."""

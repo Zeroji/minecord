@@ -9,9 +9,14 @@ STOP_SRV = '⏹'
 KILL_SRV = '💀'
 RESTART_SRV = '🔁'
 ACCEPT_EULA = '✅'
+CHAT_START = '✉'
+CHAT_STOP = '🔇'
+CHAT_REPLY = '📩'
 
 TRIGGERS = {
     'eula': [ACCEPT_EULA],
     'start': [START_SRV],
-    'control': [STOP_SRV, KILL_SRV, RESTART_SRV]
+    'control': [STOP_SRV, KILL_SRV, RESTART_SRV],
+    'chat': [CHAT_REPLY, CHAT_STOP],
+    'chat_init': [CHAT_START]
 }
