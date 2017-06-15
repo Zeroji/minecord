@@ -12,5 +12,6 @@ ACCEPT_EULA = '✅'
 
 TRIGGERS = {
     'eula': [ACCEPT_EULA],
-    'server': [START_SRV, STOP_SRV, KILL_SRV, RESTART_SRV]
+    'start': [START_SRV],
+    'control': [STOP_SRV, KILL_SRV, RESTART_SRV]
 }
