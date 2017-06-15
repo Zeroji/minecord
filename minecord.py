@@ -20,12 +20,16 @@ class Client(discord.Client):
         self.triggers: dict = {}
         self.me: discord.Member = None
         self.chat: bool = False
+        self.shells: dict = {}
 
     # discord.py events
 
     async def on_message(self, message):
         if message.channel != self.channel:
             return  # Only one channel
+        if message.author.id in self.shells:  # Active shell
+            await self.shell_wrapper(message.author, message.clean_content)
+            return
         if not message.content.startswith(self.user.mention):
             return  # Must start with a mention
         if message.author == self.me:
@@ -76,6 +80,8 @@ class Client(discord.Client):
             if reaction.emoji == emoji.CHAT_STOP:
                 self.chat = False
                 await self.set_trigger('chat', None)
+            elif reaction.emoji == emoji.CHAT_SHELL:
+                await self.shell_activate(user, self.shell_chat)
         else:
             await self.send('Reaction received: ' + reaction.emoji)
 
@@ -120,10 +126,35 @@ class Client(discord.Client):
                 for reaction in msg.reactions:
                     if reaction.me and reaction.emoji in emoji.TRIGGERS[tag]:
                         await self.remove_reaction(msg, reaction.emoji, self.me)
-        if message is None:
             self.triggers.pop(tag)
-        else:
+        if message is not None:
             self.triggers[tag] = message.id
+
+    # shells
+
+    async def shell_activate(self, user: discord.Member, shell):
+        if user.id in self.shells:
+            if self.shells[user.id] != shell:
+                await self.send('Another shell is already activated for ' + user.mention)
+            return
+        self.shells[user.id] = self.shell_chat
+        await self.send('Shell initiated for ' + user.mention)
+
+    async def shell_wrapper(self, user: discord.Member, message: str):
+        if user.id not in self.shells:
+            return
+        if message.lower() == 'exit':
+            await self.send('Shell terminated for ' + user.mention)
+            self.shells.pop(user.id)
+            return
+        shell = self.shells[user.id]
+        await shell(user, message)
+
+    async def shell_chat(self, user: discord.Member, message: str):
+        """Forward user messages to Minecraft."""
+        author = user.nick or user.name
+        message = message.replace('\n', '').replace('/', '').replace('§', '')
+        self.console(f'say <{author}> {message}')
 
     # server-related events
 
@@ -157,7 +188,7 @@ class Client(discord.Client):
             if line.startswith('[Server] '):
                 message = line[9:]
                 author = 'SERVER'
-                if line.startswith('<'):  # Message sent by the bridge
+                if message.startswith('<'):  # Message sent by the bridge
                     return
             else:
                 match = re.match(r'<([^\s<>]*)> (.*)', line)
@@ -168,6 +199,8 @@ class Client(discord.Client):
 
     def console(self, message):
         """Send a command to the server."""
+        if self.proc is None or self.proc.poll() is not None:
+            return
         message = message.split('\n')[0] + '\n'
         self.proc.stdin.write(message.encode())
         self.proc.stdin.flush()
@@ -178,6 +211,8 @@ class Client(discord.Client):
         self.loop.create_task(self.read_console())
 
     async def _stop(self):
+        if self.proc is None or self.proc.poll() is not None:
+            return
         self.console('stop')
         try:
             await self.loop.run_in_executor(None, self.proc.wait, 10)
@@ -188,6 +223,8 @@ class Client(discord.Client):
             return True
 
     async def _kill(self):
+        if self.proc is None or self.proc.poll() is not None:
+            return
         self.console('say Killing server!')
         await asyncio.sleep(0.5)
         self.proc.kill()

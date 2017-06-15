@@ -54,3 +54,12 @@ server.
 Occasionally, the client will add reactions to its own messages. You can then
 click on them to trigger certain actions, for example accepting the EULA
 or restarting the server.
+
+#### Shells
+
+Through certain buttons or commands, you can activate a "shell". Once it's
+activated, everything you type will be sent directly to it, instead of the
+main message processing. To exit a shell, simply type `exit`.
+
+As of now, the only shell available is the chat shell, which forwards all of
+your messages in the channel to the linked Minecraft server.
