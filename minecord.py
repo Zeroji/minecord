@@ -205,7 +205,7 @@ class Client(discord.Client):
         success = await self._stop()
         t = time.time() - t
         if success:
-            await self.send('Server stopped in {time:.3f}'.format(time=t))
+            await self.send('Server stopped in {time:.3f}s'.format(time=t))
         else:
             await self.send('Server timed out and was killed')
 
