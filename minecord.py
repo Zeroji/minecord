@@ -139,17 +139,28 @@ class Client(discord.Client):
     async def shell_activate(self, user: discord.Member, shell):
         if user.id in self.shells:
             if self.shells[user.id] != shell:
-                await self.send('Another shell is already activated for ' + user.mention)
+                await self.send('Another shell is already activated for ' + user.mention + ' (quit with `exit`)')
             return
-        self.shells[user.id] = self.shell_chat
+        self.shells[user.id] = shell
         await self.send('Shell initiated for ' + user.mention)
+
+    async def shell_terminate(self, user: discord.Member):
+        if user.id not in self.shells:
+            return
+        await self.send('Shell terminated for ' + user.mention)
+        self.shells.pop(user.id)
+
+    async def shell_terminate_all(self, shell):
+        uids = [uid for (uid, sh) in self.shells.items() if sh == shell]
+        for uid in uids:
+            self.shells.pop(uid)
+        await self.send('All `' + shell.__name__[6:] + '` shells terminated.')
 
     async def shell_wrapper(self, user: discord.Member, message: str):
         if user.id not in self.shells:
             return
         if message.lower() == 'exit':
-            await self.send('Shell terminated for ' + user.mention)
-            self.shells.pop(user.id)
+            await self.shell_terminate(user)
             return
         shell = self.shells[user.id]
         await shell(user, message)
@@ -219,7 +230,7 @@ class Client(discord.Client):
             return
         self.console('stop')
         try:
-            await self.loop.run_in_executor(None, self.proc.wait, 10)
+            await self.loop.run_in_executor(None, self.proc.wait, self.cfg['mc-kill-timeout'])
         except subprocess.TimeoutExpired:
             await self.kill()
             return False
@@ -272,6 +283,8 @@ class Client(discord.Client):
         await self.set_trigger('chat', None)
         tag = 'chat' if self.chat else 'chat_init'
         self.chat_message = await self.send_tag(tag, emoji.TRIGGERS[tag], 'Chat enabled' if self.chat else 'Chat muted')
+        if not self.chat:
+            await self.shell_terminate_all(self.shell_chat)
 
 
 def main():
