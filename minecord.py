@@ -1,5 +1,6 @@
 """A Discord-based tool to manage a Minecraft server."""
 import asyncio
+import inspect
 import json
 import os
 import subprocess
@@ -41,14 +42,11 @@ class Client(discord.Client):
             return
         if len(text) == 0:
             return  # No empty messages
-        if text.startswith('bye'):
-            await self.kill_server()
-            await self.logout()
-        elif text.startswith('start'):
-            await self.start_server()
-        else:  # Send command to server
-            if self.proc is not None and self.proc.poll() is None:
-                self.console(text)
+        if ' ' not in text:
+            cmd, args = text, ''
+        else:
+            cmd, args = text.split(None, 1)
+        await self.call(message.author, cmd, args)
 
     async def on_reaction_add(self, reaction: discord.Reaction, user):
         if user == self.me:  # No reacting to self
@@ -62,26 +60,24 @@ class Client(discord.Client):
         for r in reaction.message.reactions:  # Reaction must have been added by the client
             if r.emoji == reaction.emoji and not r.me:
                 return
+        async def rcall(command, args=''):
+            await self.call(user, command, args, reaction=True)
         if tag == 'eula':  # Accept EULA
-            eula = os.path.join(self.cfg['mc-directory'], 'eula.txt')
-            content = open(eula).read().replace('eula=false', 'eula=true')
-            open(eula, 'w').write(content)
-            await self.set_trigger('eula', None)
-            await self.send_tag('start', emoji.START_SRV, 'EULA accepted. You can now start the server.')
+            await rcall('eula')
         elif tag == 'start':
-            await self.start_server()
+            await rcall('start')
         elif tag == 'control':
             if reaction.emoji == emoji.STOP_SRV:
-                await self.stop_server()
+                await rcall('stop')
             elif reaction.emoji == emoji.KILL_SRV:
-                await self.kill_server()
+                await rcall('kill')
             elif reaction.emoji == emoji.RESTART_SRV:
-                await self.restart_server()
+                await rcall('restart')
         elif tag == 'chat_init':
-            await self.set_chat(True)
+            await rcall('chat', 'true')
         elif tag == 'chat':
             if reaction.emoji == emoji.CHAT_STOP:
-                await self.set_chat(False)
+                await rcall('chat', 'false')
             elif reaction.emoji == emoji.CHAT_SHELL:
                 await self.shell_activate(user, self.shell_chat)
         else:
@@ -93,6 +89,11 @@ class Client(discord.Client):
         self.prefixes.append(self.user.mention)
         self.prefixes.extend(self.cfg['prefixes'])
         await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
+
+    async def quit(self):
+        """Terminate server and stop minecord."""
+        await self.kill_server()
+        await self.logout()
 
     # discord-related functions
 
@@ -212,6 +213,28 @@ class Client(discord.Client):
 
     # server-related functions
 
+    async def call(self, user: discord.Member, command, args='', reaction=False):
+        """Call a command, checking your privilege."""
+        commands = {'quit': self.quit,
+                    'start': self.start_server, 'stop': self.stop_server, 'restart': self.restart_server,
+                    'kill': self.kill_server, 'eula': self.accept_eula, 'chat': self.set_chat}
+        if command in commands:
+            func = commands[command]
+            sig = inspect.signature(func)
+            if 'args' in sig.parameters:
+                await func(args)
+            else:
+                await func()
+        else:
+            self.console(' '.join((command, args)))
+
+    async def accept_eula(self):
+        eula = os.path.join(self.cfg['mc-directory'], 'eula.txt')
+        content = open(eula).read().replace('eula=false', 'eula=true')
+        open(eula, 'w').write(content)
+        await self.set_trigger('eula', None)
+        await self.send_tag('start', emoji.START_SRV, 'EULA accepted. You can now start the server.')
+
     def console(self, message):
         """Send a command to the server."""
         if self.proc is None or self.proc.poll() is not None:
@@ -239,10 +262,11 @@ class Client(discord.Client):
 
     async def _kill(self):
         if self.proc is None or self.proc.poll() is not None:
-            return
+            return False
         self.console('say Killing server!')
         await asyncio.sleep(0.5)
         self.proc.kill()
+        return True
 
     async def start_server(self):
         self._start()
@@ -265,15 +289,17 @@ class Client(discord.Client):
         await self.set_trigger('chat_init', None)
 
     async def kill_server(self):
-        await self._kill()
-        await self.send('Server killed')
+        """Kill the server."""
+        if await self._kill():
+            await self.send('Server killed')
 
     async def restart_server(self):
         await self.stop_server()
         self._start()
         await self.send_tag('control', emoji.TRIGGERS['control'], 'Server restarted!')
 
-    async def set_chat(self, value):
+    async def set_chat(self, args):
+        value = args if isinstance(args, bool) else args.lower() in ('yes', 'true', '1')
         if self.chat == value:
             return
         self.chat = value
