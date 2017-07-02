@@ -8,6 +8,7 @@ import re
 import time
 import discord
 import emoji
+import permissions
 
 
 class Client(discord.Client):
@@ -24,6 +25,7 @@ class Client(discord.Client):
         self.shells: dict = {}
         self.chat_message: discord.Message = None
         self.prefixes: list = []
+        self.perms: permissions.Permissions = None
 
     # discord.py events
 
@@ -88,6 +90,7 @@ class Client(discord.Client):
         self.me = self.channel.server.me
         self.prefixes.append(self.user.mention)
         self.prefixes.extend(self.cfg['prefixes'])
+        self.perms = permissions.Permissions(self.cfg['role-config'], self.cfg['role-users'])
         await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
 
     async def quit(self):
@@ -218,6 +221,12 @@ class Client(discord.Client):
         commands = {'quit': self.quit,
                     'start': self.start_server, 'stop': self.stop_server, 'restart': self.restart_server,
                     'kill': self.kill_server, 'eula': self.accept_eula, 'chat': self.set_chat}
+        user_perms = self.perms[user.id]
+        if command not in user_perms:
+            if user_perms:  # Don't display the message if the user has no permissions at all
+                await self.send("{user}, you are not allowed to use the command `{command}`".format(
+                    user=user.mention, command=command))
+            return
         if command in commands:
             func = commands[command]
             sig = inspect.signature(func)

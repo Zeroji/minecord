@@ -4,5 +4,7 @@
   "mc-kill-timeout": 15,
   "auth-token": "token",
   "channel": "177289345219297281",
-  "prefixes": ["mc"]
+  "prefixes": ["mc"],
+  "role-config": "roles.json",
+  "role-users": "users.json"
 }
