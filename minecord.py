@@ -90,7 +90,7 @@ class Client(discord.Client):
         self.me = self.channel.server.me
         self.prefixes.append(self.user.mention)
         self.prefixes.extend(self.cfg['prefixes'])
-        self.perms = permissions.Permissions(self.cfg['role-config'], self.cfg['role-users'])
+        self.perms = permissions.Permissions(self.cfg['role-config'], self.cfg['role-users'], self)
         await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
 
     async def quit(self):
@@ -243,7 +243,9 @@ class Client(discord.Client):
         """Call a command, checking your privilege."""
         commands = {'quit': self.quit,
                     'start': self.start_server, 'stop': self.stop_server, 'restart': self.restart_server,
-                    'kill': self.kill_server, 'eula': self.accept_eula, 'chat': self.set_chat}
+                    'kill': self.kill_server, 'eula': self.accept_eula, 'chat': self.set_chat,
+                    'rlist': self.perms.list_roles, 'rget': self.perms.show_role, 'rset': self.perms.set_role,
+                    'reload_perms': self.reload_perms}
         user_perms = self.perms[user.id]
         if command not in user_perms:
             if user_perms:  # Don't display the message if the user has no permissions at all
@@ -253,10 +255,12 @@ class Client(discord.Client):
         if command in commands:
             func = commands[command]
             sig = inspect.signature(func)
+            kw = {}
             if 'args' in sig.parameters:
-                await func(args)
-            else:
-                await func()
+                kw['args'] = args
+            if 'user' in sig.parameters:
+                kw['user'] = user
+            await func(**kw)
         else:
             self.console(' '.join((command, args)))
 
@@ -343,6 +347,11 @@ class Client(discord.Client):
         self.chat_message = await self.send_tag(tag, emoji.TRIGGERS[tag], 'Chat enabled' if self.chat else 'Chat muted')
         if not self.chat:
             await self.shell_terminate_all(self.shell_chat)
+
+    async def reload_perms(self):
+        """Reload all permission settings from disk."""
+        self.perms.reload()
+        await self.send('Successfully reloaded permission settings.')
 
 
 def main():
