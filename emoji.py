@@ -12,6 +12,8 @@ ACCEPT_EULA = '✅'
 CHAT_START = '✉'
 CHAT_STOP = '🔇'
 CHAT_SHELL = '📩'
+ERROR_MAIN = '❌'
+ERROR_PERM = '⛔'
 
 TRIGGERS = {
     'eula': [ACCEPT_EULA],

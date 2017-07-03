@@ -124,6 +124,16 @@ class Client(discord.Client):
         msg = await self.send(message, *args, **kwargs)
         await self.delay(timeout, self.delete_message, msg)
 
+    async def send_error(self, message, *args, **kwargs):
+        if isinstance(message, str):
+            message = emoji.ERROR_MAIN + ' ' + message
+        await self.send(message, *args, **kwargs)
+
+    async def send_error_perms(self, message, *args, **kwargs):
+        if isinstance(message, str):
+            message = emoji.ERROR_PERM + ' ' + message
+        await self.send_delete(10, message, *args, **kwargs)
+
     async def set_trigger(self, tag, message):
         """Set/change a trigger message.
 
@@ -237,7 +247,7 @@ class Client(discord.Client):
         user_perms = self.perms[user.id]
         if command not in user_perms:
             if user_perms:  # Don't display the message if the user has no permissions at all
-                await self.send_delete(5, "{user}, you are not allowed to use the command `{command}`".format(
+                await self.send_error_perms("{user}, you are not allowed to use the command `{command}`".format(
                     user=user.mention, command=command))
             return
         if command in commands:
