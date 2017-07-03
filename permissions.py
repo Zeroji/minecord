@@ -5,7 +5,8 @@ import json
 class Role:
     """Define a role, with permissions and sub-roles."""
 
-    def __init__(self, all_perms=set()):
+    def __init__(self, name='', all_perms=set()):
+        self.name = name
         self.all_perms = all_perms
         self.perms = []
         self.sub_roles = []
@@ -20,11 +21,13 @@ class Role:
         self.all_perms.update(self.perms)
 
     def __contains__(self, item):
-        """Whether or not a permission is contained."""
+        """Whether or not a permission/role is contained."""
+        if item == '#' + self.name:
+            return True
         contain = item in self.perms or any([item in role for role in self.sub_roles])
         if contain:
             return True
-        if item == '@':
+        if item == '@' or item.startswith('#'):
             return False
         if item not in self.all_perms:
             return '@' in self
@@ -42,29 +45,33 @@ class Permissions:
         self.all_perms = set()
         self.roles = {}
         self.users = {}
-        self.reload_roles()
-        self.reload_users()
+        self.reload()
 
     def __getitem__(self, item):
         """Get a user's role."""
-        return self.users.get(item, Role())
+        if item not in self.users:
+            return Role()
+        else:
+            return self.get_role(self.users[item])
 
-    def reload_roles(self):
+    def reload(self):
+        """Reload roles and users."""
         self.all_perms.clear()
         self.roles.clear()
         data = json.load(open(self.roles_filename))
         for role in data:
-            self.roles[role] = Role(self.all_perms)
+            self.roles[role] = Role(role, self.all_perms)
         for name, role in self.roles.items():
             role.load(data[name], self)
         if '@' in self.all_perms:
             self.all_perms.remove('@')
+        self.reload_users()
 
     def reload_users(self):
+        """Reload users."""
         self.users.clear()
         data = json.load(open(self.users_filename))
-        for uid, role_name in data.items():
-            self.users[uid] = self.get_role(role_name)
+        self.users.update(data)
 
     def get_role(self, name):
-        return self.roles[name]
+        return self.roles.get(name, Role())
