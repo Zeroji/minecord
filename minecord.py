@@ -119,6 +119,11 @@ class Client(discord.Client):
         await self.set_trigger(tag, message)
         return message
 
+    async def send_delete(self, timeout, message, *args, **kwargs):
+        """Send a message, and delete it after a certain amount of time."""
+        msg = await self.send(message, *args, **kwargs)
+        await self.delay(timeout, self.delete_message, msg)
+
     async def set_trigger(self, tag, message):
         """Set/change a trigger message.
 
@@ -137,6 +142,14 @@ class Client(discord.Client):
             self.triggers.pop(tag)
         if message is not None:
             self.triggers[tag] = message.id
+
+    async def delay(self, sleep_time, func, *args, **kwargs):
+        self.loop.create_task(self._delay(sleep_time, func, *args, **kwargs))
+
+    @staticmethod
+    async def _delay(sleep_time, func, *args, **kwargs):
+        await asyncio.sleep(sleep_time)
+        await func(*args, **kwargs)
 
     # shells
 
@@ -224,7 +237,7 @@ class Client(discord.Client):
         user_perms = self.perms[user.id]
         if command not in user_perms:
             if user_perms:  # Don't display the message if the user has no permissions at all
-                await self.send("{user}, you are not allowed to use the command `{command}`".format(
+                await self.send_delete(5, "{user}, you are not allowed to use the command `{command}`".format(
                     user=user.mention, command=command))
             return
         if command in commands:
