@@ -79,7 +79,8 @@ class Permissions:
         return self.roles.get(name, Role())
 
     async def list_roles(self, args):
-        """List different roles, or list the permissions of a role."""
+        """List different roles, or list the permissions of a role.
+        Using `rlist Role` will display info about this role."""
         if not args:
             await self.client.send("The following roles exist: " + ', '.join(['#**%s**' % name for name in self.roles]))
         else:
@@ -94,7 +95,8 @@ class Permissions:
                 await self.client.send(message)
 
     async def show_role(self, args):
-        """Display someone's role."""
+        """Display someone's role.
+        Either a mention or a User ID can be used."""
         uid = get_uid(args)
         if uid is None:
             return
@@ -104,7 +106,9 @@ class Permissions:
             await self.client.send('This user has the #**{role}** role.'.format(role=self.users[uid]))
 
     async def set_role(self, args, user):
-        """Set or remove someone's role."""
+        """Set or remove someone's role.
+        Either a mention or a User ID can be used.
+        To remove a role, just use `rset @user`."""
         if ' ' in args:
             target, new_role = args.split(None, 1)
             new_role = new_role.lstrip('#')
