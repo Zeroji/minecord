@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """A Discord-based tool to manage a Minecraft server."""
 import asyncio
 import inspect
