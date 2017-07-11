@@ -7,5 +7,6 @@
   "channel": "177289345219297281",
   "prefixes": ["mc"],
   "role-config": "roles.json",
-  "role-users": "users.json"
+  "role-users": "users.json",
+  "short-name": "[MC0]"
 }

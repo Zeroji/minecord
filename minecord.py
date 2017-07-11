@@ -110,9 +110,11 @@ class Client(discord.Client):
 
     # discord-related functions
 
-    async def send(self, *args, **kwargs):
+    async def send(self, message, *args, **kwargs):
         """Shortcut for send_message."""
-        return await self.send_message(self.channel, *args, **kwargs)
+        if isinstance(message, str) and len(self.cfg['short-name']) > 0:
+            message = ' '.join((self.cfg['short-name'], message))
+        return await self.send_message(self.channel, message, *args, **kwargs)
 
     async def send_react(self, reactions, *args, **kwargs):
         """Send a message and add reactions to it."""
