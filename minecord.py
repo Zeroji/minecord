@@ -99,6 +99,8 @@ class Client(discord.Client):
                          'rlist': self.perms.list_roles, 'rget': self.perms.show_role, 'rset': self.perms.set_role,
                          'reload': self.reload_perms}
         await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
+        if self.cfg['mc-autostart']:
+            await self.start_server()
 
     async def quit(self):
         """Terminate server and stop minecord."""
