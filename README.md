@@ -37,11 +37,13 @@ You need to edit `config.json` to specify a couple options:
 `mc-command`: the command line used to run the server  
 `mc-directory`: the path to the directory you created  
 `mc-kill-timeout`: the time (in seconds) to wait before killing the server when stopping  
+`mc-autostart`: `true` to automatically start Minecraft with minecord  
 `auth-token`: the path to your authentication token  
 `channel`: the ID of the Discord channel to work in  
 `prefixes`: a list of command prefixes in addition to `@minecord`  
 `role-config`: path to the role configuration JSON file  
-`role-users`: path to the role/user assignations JSON file
+`role-users`: path to the role/user assignations JSON file  
+`short-name`: a short name displayed before all messages (useful with multiple servers)  
 
 #### Usage
 
