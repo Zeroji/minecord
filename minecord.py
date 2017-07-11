@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """A Discord-based tool to manage a Minecraft server."""
+import argparse
 import asyncio
 import inspect
 import json
@@ -388,8 +389,16 @@ class Client(discord.Client):
 
 
 def main():
-    config = json.load(open('config.json'))
-    token = open(config['auth-token']).read().strip()
+    parser = argparse.ArgumentParser(description='Start minecord.')
+    parser.add_argument('-c', '--config', action='store', metavar='file', help='Specify config file')
+    parser.add_argument('-t', '--token', action='store', metavar='file', help='Specify bot token file')
+    parser.add_argument('-a', '--auto', action='store_const', default=False, const=True, help='Autostart the server')
+    args = parser.parse_args()
+
+    config = json.load(open(args.config or 'config.json'))
+    token = open(args.token or config['auth-token']).read().strip()
+    if args.auto:
+        config['mc-autostart'] = True
     client = Client(config)
     client.run(token)
 
