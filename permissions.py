@@ -28,7 +28,7 @@ class Role:
         contain = item in self.perms or any([item in role for role in self.sub_roles])
         if contain:
             return True
-        if item == '@' or item.startswith('#'):
+        if item == '@' or any([item.startswith(pre) for pre in ('#', '$')]):
             return False
         if item not in self.all_perms:
             return '@' in self

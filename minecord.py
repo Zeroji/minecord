@@ -29,6 +29,7 @@ class Client(discord.Client):
         self.prefixes: list = []
         self.perms: permissions.Permissions = None
         self.commands = {}
+        self.shell_commands = {'chat': self.shell_chat}
 
     # discord.py events
 
@@ -84,7 +85,7 @@ class Client(discord.Client):
             if reaction.emoji == emoji.CHAT_STOP:
                 await rcall('chat', 'false')
             elif reaction.emoji == emoji.CHAT_SHELL:
-                await self.shell_activate(user, self.shell_chat)
+                await rcall('shell', 'chat')
         else:
             await self.send('Reaction received: ' + reaction.emoji)
 
@@ -98,7 +99,7 @@ class Client(discord.Client):
                          'start': self.start_server, 'stop': self.stop_server, 'restart': self.restart_server,
                          'kill': self.kill_server, 'eula': self.accept_eula, 'chat': self.set_chat,
                          'rlist': self.perms.list_roles, 'rget': self.perms.show_role, 'rset': self.perms.set_role,
-                         'reload': self.reload_perms}
+                         'reload': self.reload_perms, 'shell': self.shell_activate}
         await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
         if self.cfg['mc-autostart']:
             await self.start_server()
@@ -193,7 +194,15 @@ class Client(discord.Client):
 
     # shells
 
-    async def shell_activate(self, user: discord.Member, shell):
+    async def shell_activate(self, user: discord.Member, args):
+        shell_name = args.split()[0].lower()
+        shell = self.shell_commands.get(shell_name)
+        if shell is None:
+            return
+        if '${shell}'.format(shell=shell_name) not in self.perms[user.id]:
+            await self.send_error_perms("{user}, your are not allowed to start the shell `{shell}`".format(
+                user=user.mention, shell=shell_name))
+            return
         if user.id in self.shells:
             if self.shells[user.id] != shell:
                 await self.send('Another shell is already activated for ' + user.mention + ' (quit with `exit`)')

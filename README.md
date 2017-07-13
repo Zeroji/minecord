@@ -64,9 +64,9 @@ or restarting the server.
 
 #### Shells
 
-Through certain buttons or commands, you can activate a "shell". Once it's
-activated, everything you type will be sent directly to it, instead of the
-main message processing. To exit a shell, simply type `exit`.
+Through certain buttons or via the `shell` command, you can activate a "shell".
+Once it's activated, everything you type will be sent directly to it, unless
+you use a prefix like `@minecord`. To exit a shell, simply type `exit`.
 
 As of now, the only shell available is the chat shell, which forwards all of
 your messages in the channel to the linked Minecraft server.
@@ -93,6 +93,10 @@ of commands that role can use. Other roles can be referenced using '#role'.
 The special command `@` can be used to allow a role to use any command that
 is not present in the file. This is useful when you want someone to have full
 access to the Minecraft commands, but restrict the minecord side.
+
+Shells also have permissions, to enable someone to use the shell `chat`, just
+add `"$chat"` in the file. Users with the `@` permission will not have access
+to any shell, you have to manually add them.
 
 ##### users.json
 
