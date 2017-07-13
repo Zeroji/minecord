@@ -8,5 +8,6 @@
   "prefixes": ["mc"],
   "role-config": "roles.json",
   "role-users": "users.json",
+  "shell-timeout": 300,
   "short-name": "[MC0]"
 }

@@ -204,20 +204,23 @@ class Client(discord.Client):
                 user=user.mention, shell=shell_name))
             return
         if user.id in self.shells:
-            if self.shells[user.id] != shell:
+            if self.shells[user.id]['shell'] != shell:
                 await self.send('Another shell is already activated for ' + user.mention + ' (quit with `exit`)')
             return
-        self.shells[user.id] = shell
+        self.shells[user.id] = {'shell': shell, 'time': time.time()}
         await self.send('Shell initiated for ' + user.mention)
 
-    async def shell_terminate(self, user: discord.Member):
+    async def shell_terminate(self, user: discord.Member, reason=None):
         if user.id not in self.shells:
             return
-        await self.send('Shell terminated for ' + user.mention)
+        message = 'Shell terminated for {user}'.format(user=user.mention)
+        if reason is not None:
+            message = '{msg} ({reason})'.format(msg=message, reason=reason)
+        await self.send(message)
         self.shells.pop(user.id)
 
     async def shell_terminate_all(self, shell):
-        uids = [uid for (uid, sh) in self.shells.items() if sh == shell]
+        uids = [uid for (uid, sh) in self.shells.items() if sh['shell'] == shell]
         for uid in uids:
             self.shells.pop(uid)
         await self.send('All `' + shell.__name__[6:] + '` shells terminated.')
@@ -228,8 +231,12 @@ class Client(discord.Client):
         if message.lower() == 'exit':
             await self.shell_terminate(user)
             return
-        shell = self.shells[user.id]
-        await shell(user, message)
+        sh = self.shells[user.id]
+        if time.time() > sh['time'] + self.cfg['shell-timeout']:
+            await self.shell_terminate(user, 'timed out')
+            return
+        sh['time'] = time.time()
+        await sh['shell'](user, message)
 
     async def shell_chat(self, user: discord.Member, message: str):
         """Forward user messages to Minecraft."""

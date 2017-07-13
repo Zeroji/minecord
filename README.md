@@ -44,6 +44,7 @@ You need to edit `config.json` to specify a couple options:
 `role-config`: path to the role configuration JSON file  
 `role-users`: path to the role/user assignations JSON file  
 `short-name`: a short name displayed before all messages (useful with multiple servers)  
+`shell-timeout`: the time (in seconds) after which a shell will close  
 
 #### Usage
 
