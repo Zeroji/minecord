@@ -57,31 +57,31 @@ class Client(discord.Client):
     async def on_reaction_add(self, reaction: discord.Reaction, user):
         if user == self.me:  # No reacting to self
             return
-        tag = None
-        for t, msg in self.triggers.items():
+        tags = []
+        for tag, msg in self.triggers.items():
             if reaction.message.id == msg:
-                tag = t
-        if tag is None:  # Message must be a trigger
+                tags.append(tag)
+        if len(tags) == 0:  # Message must be a trigger
             return
         for r in reaction.message.reactions:  # Reaction must have been added by the client
             if r.emoji == reaction.emoji and not r.me:
                 return
         async def rcall(command, args=''):
             await self.call(user, command, args, reaction=True)
-        if tag == 'eula':  # Accept EULA
+        if 'eula' in tags:  # Accept EULA
             await rcall('eula')
-        elif tag == 'start':
+        elif 'start' in tags:
             await rcall('start')
-        elif tag == 'control':
+        elif 'control' in tags:
             if reaction.emoji == emoji.STOP_SRV:
                 await rcall('stop')
             elif reaction.emoji == emoji.KILL_SRV:
                 await rcall('kill')
             elif reaction.emoji == emoji.RESTART_SRV:
                 await rcall('restart')
-        elif tag == 'chat_init':
+        elif 'chat_init' in tags:
             await rcall('chat', 'true')
-        elif tag == 'chat':
+        elif 'chat' in tags:
             if reaction.emoji == emoji.CHAT_STOP:
                 await rcall('chat', 'false')
             elif reaction.emoji == emoji.CHAT_SHELL:
