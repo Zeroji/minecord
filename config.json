@@ -6,6 +6,8 @@
   "auth-token": "token",
   "channel": "177289345219297281",
   "prefixes": ["mc"],
+  "process-file-in": "p_in",
+  "process-file-out": "p_out",
   "role-config": "roles.json",
   "role-users": "users.json",
   "shell-timeout": 300,

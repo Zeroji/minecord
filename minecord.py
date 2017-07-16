@@ -7,8 +7,10 @@ import json
 import os
 import subprocess
 import re
+import threading
 import time
 import discord
+import psutil
 import emoji
 import permissions
 
@@ -19,7 +21,9 @@ class Client(discord.Client):
     def __init__(self, config):
         super(Client, self).__init__()
         self.channel: discord.Channel = None
-        self.proc: subprocess.Popen = None
+        self.proc: psutil.Process = None
+        self.proc_in = None
+        self.proc_out = None
         self.cfg: dict = config
         self.triggers: dict = {}
         self.me: discord.Member = None
@@ -248,8 +252,8 @@ class Client(discord.Client):
 
     async def read_console(self):
         """Loop through the console output"""
-        while self.proc is not None and self.proc.poll() is None:
-            line = await self.loop.run_in_executor(None, self.proc.stdout.readline)  # Async readline
+        while self.proc is not None and self.proc.is_running():
+            line = await self.loop.run_in_executor(None, self.proc_out.readline)  # Async readline
             # Parse the command output and get the time in epoch format
             match = re.match(r'\[([0-9]{2}):([0-9]{2}):([0-9]{2})\] \[([^][]*)\]: (.*)$', line.decode())
             if match is None:
@@ -317,19 +321,39 @@ class Client(discord.Client):
 
     def console(self, message):
         """Send a command to the server."""
-        if self.proc is None or self.proc.poll() is not None:
+        if self.proc is None or not self.proc.is_running():
             return
         message = message.split('\n')[0] + '\n'
-        self.proc.stdin.write(message.encode())
-        self.proc.stdin.flush()
+        self.proc_in.write(message.encode())
+        self.proc_in.flush()
+
+    def _start_thread(self, pin, pout):
+        pinfile = open(pin, 'rb', 0)
+        poutfile = open(pout, 'wb', 0)
+        process = subprocess.Popen(self.cfg['mc-command'].split(), cwd=self.cfg['mc-directory'],
+                                   stdin=pinfile, stdout=poutfile, stderr=poutfile)
+        self.proc = psutil.Process(process.pid)
 
     def _start(self):
-        self.proc = subprocess.Popen(self.cfg['mc-command'].split(), cwd=self.cfg['mc-directory'],
-                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        pin = self.cfg['process-file-in']
+        if os.path.exists(pin):
+            os.unlink(pin)
+        if not os.path.exists(pin):
+            os.mkfifo(pin)
+        pout = self.cfg['process-file-out']
+        if os.path.exists(pout):
+            os.unlink(pout)
+        if not os.path.exists(pout):
+            os.mkfifo(pout)
+        thread = threading.Thread(None, self._start_thread, None, (pin, pout))
+        thread.start()
+        self.proc_in = open(pin, 'wb', 0)
+        self.proc_out = open(pout, 'rb', 0)
+        thread.join()
         self.loop.create_task(self.read_console())
 
     async def _stop(self):
-        if self.proc is None or self.proc.poll() is not None:
+        if self.proc is None or not self.proc.is_running():
             return
         self.console('stop')
         try:
@@ -341,7 +365,7 @@ class Client(discord.Client):
             return True
 
     async def _kill(self):
-        if self.proc is None or self.proc.poll() is not None:
+        if self.proc is None or not self.proc.is_running():
             return False
         self.console('say Killing server!')
         await asyncio.sleep(0.5)
