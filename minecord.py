@@ -104,13 +104,33 @@ class Client(discord.Client):
                          'kill': self.kill_server, 'eula': self.accept_eula, 'chat': self.set_chat,
                          'rlist': self.perms.list_roles, 'rget': self.perms.show_role, 'rset': self.perms.set_role,
                          'reload': self.reload_perms, 'shell': self.shell_activate}
-        await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
-        if self.cfg['mc-autostart']:
-            await self.start_server()
+        pid = self._read_pid()
+        if pid is not None:
+            try:
+                process = psutil.Process(pid)
+            except psutil.NoSuchProcess:
+                self._remove_pid()
+            else:
+                print(process.cwd(), process.cmdline())
+                if process.cwd() == os.path.abspath(self.cfg['mc-directory']):
+                    self.proc = process
+                    self._open_pipes(self.cfg['process-file-in'], self.cfg['process-file-out'])
+                    m = await self.send_tag('control', emoji.TRIGGERS['control'], 'Reattached to already running server!')
+                    await self.add_reaction(m, emoji.CHAT_START)
+                    await self.set_trigger('chat_init', m)
+        if self.proc is None:
+            if self.cfg['mc-autostart']:
+                await self.start_server()
+            else:
+                await self.send_tag('start', emoji.START_SRV, "Hi everyone!")
 
     async def quit(self):
         """Terminate server and stop minecord."""
-        await self.kill_server()
+        # await self.kill_server()
+        if self.proc_in is not None:
+            self.proc_in.close()
+        if self.proc_out is not None:
+            self.proc_out.close()
         await self.logout()
 
     # discord-related functions
@@ -269,6 +289,7 @@ class Client(discord.Client):
 
     async def on_line(self, timestamp, logger, line: str):
         """Process one line of output."""
+        print(line)
         if line.startswith('You need to agree to the EULA in order to run the server.'):  # EULA error
             message = "You need to agree to Mojang's End-User License Agreement in order to run the server.\n" \
                 "For more information, please visit <https://account.mojang.com/documents/minecraft_eula>.\n" \
@@ -327,29 +348,59 @@ class Client(discord.Client):
         self.proc_in.write(message.encode())
         self.proc_in.flush()
 
-    def _start_thread(self, pin, pout):
-        pinfile = open(pin, 'rb', 0)
-        poutfile = open(pout, 'wb', 0)
+    def _start_thread(self, pipe_in, pipe_out):
+        pipe_in_file = open(pipe_in, 'rb', 0)
+        pipe_out_file = open(pipe_out, 'wb', 0)
         process = subprocess.Popen(self.cfg['mc-command'].split(), cwd=self.cfg['mc-directory'],
-                                   stdin=pinfile, stdout=poutfile, stderr=poutfile)
+                                   stdin=pipe_in_file, stdout=pipe_out_file, stderr=pipe_out_file)
+        self._write_pid(process.pid)
         self.proc = psutil.Process(process.pid)
 
+    def _read_pid(self):
+        """Read PID from file, return int or None."""
+        pid_file = self.cfg['process-file-pid']
+        if not os.path.exists(pid_file):
+            return None
+        with open(pid_file, 'r') as f:
+            pid_s = f.read().strip()
+            try:
+                pid = int(pid_s)
+            except ValueError:
+                return None
+            else:
+                return pid
+
+    def _write_pid(self, pid):
+        """Write PID (string or int) to file."""
+        pid_file = self.cfg['process-file-pid']
+        with open(pid_file, 'w') as f:
+            f.write(str(pid))
+
+    def _remove_pid(self):
+        """Remove PID file."""
+        pid_file = self.cfg['process-file-pid']
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+
+    def _open_pipes(self, pipe_in, pipe_out):
+        self.proc_in = open(pipe_in, 'wb', 0)
+        self.proc_out = open(pipe_out, 'rb', 0)
+
     def _start(self):
-        pin = self.cfg['process-file-in']
-        if os.path.exists(pin):
-            os.unlink(pin)
-        if not os.path.exists(pin):
-            os.mkfifo(pin)
-        pout = self.cfg['process-file-out']
-        if os.path.exists(pout):
-            os.unlink(pout)
-        if not os.path.exists(pout):
-            os.mkfifo(pout)
-        thread = threading.Thread(None, self._start_thread, None, (pin, pout))
-        thread.start()
-        self.proc_in = open(pin, 'wb', 0)
-        self.proc_out = open(pout, 'rb', 0)
-        thread.join()
+        pipe_in = self.cfg['process-file-in']
+        if os.path.exists(pipe_in):
+            os.unlink(pipe_in)
+        if not os.path.exists(pipe_in):
+            os.mkfifo(pipe_in)
+        pipe_out = self.cfg['process-file-out']
+        if os.path.exists(pipe_out):
+            os.unlink(pipe_out)
+        if not os.path.exists(pipe_out):
+            os.mkfifo(pipe_out)
+        thread_create = threading.Thread(None, self._start_thread, None, (pipe_in, pipe_out))
+        thread_create.start()
+        self._open_pipes(pipe_in, pipe_out)
+        thread_create.join()
         self.loop.create_task(self.read_console())
 
     async def _stop(self):
@@ -358,11 +409,13 @@ class Client(discord.Client):
         self.console('stop')
         try:
             await self.loop.run_in_executor(None, self.proc.wait, self.cfg['mc-kill-timeout'])
-        except subprocess.TimeoutExpired:
+        except psutil.TimeoutExpired:
             await self.kill()
             return False
         else:
             return True
+        finally:
+            self._remove_pid()
 
     async def _kill(self):
         if self.proc is None or not self.proc.is_running():
@@ -370,6 +423,7 @@ class Client(discord.Client):
         self.console('say Killing server!')
         await asyncio.sleep(0.5)
         self.proc.kill()
+        self._remove_pid()
         return True
 
     async def start_server(self):

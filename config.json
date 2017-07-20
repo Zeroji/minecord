@@ -8,6 +8,7 @@
   "prefixes": ["mc"],
   "process-file-in": "p_in",
   "process-file-out": "p_out",
+  "process-file-pid": "mc.pid",
   "role-config": "roles.json",
   "role-users": "users.json",
   "shell-timeout": 300,
